@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.fee.mapper.BookSummaryMapper">
+
+    <resultMap type="BookSummary" id="BookSummaryResult">
+        <result property="id"    column="id"    />
+        <result property="consumer"    column="consumer"    />
+        <result property="sum"    column="sum"    />
+        <result property="average"    column="average"    />
+        <result property="account"    column="account"    />
+        <result property="consumeDate"    column="consume_date"    />
+    </resultMap>
+
+    <resultMap type="BookMonth" id="BookMonthResult">
+        <result property="id"    column="id"    />
+        <result property="month"    column="month"    />
+    </resultMap>
+
+    <sql id="selectBookSummaryVo">
+        select id, consumer, sum, average, account, consume_date from book_summary
+    </sql>
+
+    <sql id="selectBookSummarySub">
+        SELECT
+        cast(fee as decimal(9,2)) fee,
+        date_format(date,'%Y-%m') consume_date,
+<!--        b.dict_label consumer-->
+        name consumer
+        FROM
+<!--        bookdetail a-->
+<!--        LEFT JOIN sys_dict_data b ON b.dict_type = 'consume_name'-->
+<!--        and a.name = b.dict_value-->
+        bookdetail
+    </sql>
+
+    <sql id="selectBookSummarySum">
+        select consumer, SUM(fee) sum, consume_date
+        from
+        (<include refid="selectBookSummarySub"/>) y1
+        GROUP BY consume_date, consumer
+    </sql>
+
+    <sql id="selectBookSummaryAvg">
+        select sum(sum) sum, round(avg(sum), 2) average, consume_date
+        from
+        (<include refid="selectBookSummarySum"/>) u1
+        GROUP BY consume_date
+    </sql>
+
+    <sql id="selectBookSummaryList">
+        select consumer, SUM(fee) sum, t1.consume_date, average
+        from
+        (<include refid="selectBookSummarySub"/>) t1
+        left join (<include refid="selectBookSummaryAvg"/>) t2
+        on t1.consume_date = t2.consume_date
+        GROUP BY consume_date, consumer, average
+<!--        ORDER BY consume_date, consumer-->
+    </sql>
+
+    <sql id="selectBookSummaryByParams">
+        select b.dict_label consumer, sum, consume_date, average
+        from
+        (<include refid="selectBookSummaryList"/>) f1
+        LEFT JOIN sys_dict_data b ON b.dict_type = 'consume_name'
+        and f1.consumer = b.dict_value
+<!--        ORDER BY consume_date desc, consumer-->
+    </sql>
+
+    <sql id="selectBookMonthVo">
+        select date_format(date,'%Y-%m') month
+        from
+        bookdetail
+        group by date_format(date,'%Y-%m')
+    </sql>
+
+    <sql id="selectBookMonthList">
+        select @ROWNO := @ROWNO + 1 AS id, t.*
+        from
+        (<include refid="selectBookMonthVo"/>) t,
+        (SELECT @ROWNO := 0) t3
+    </sql>
+
+    <select id="selectBookSummaryList" parameterType="BookSummary" resultMap="BookSummaryResult">
+<!--        <include refid="selectBookSummaryVo"/>-->
+<!--        <include refid="selectBookSummaryList"/>-->
+        <include refid="selectBookSummaryByParams"/>
+        <where>
+            <if test="consumer != null  and consumer != ''"> and consumer = #{consumer}</if>
+<!--            <if test="sum != null "> and sum = #{sum}</if>-->
+<!--            <if test="average != null "> and average = #{average}</if>-->
+<!--            <if test="account != null "> and account = #{account}</if>-->
+            <if test="consumeDate != null  and consumeDate != '' "> and consume_date = #{consumeDate}</if>
+        </where>
+        ORDER BY consume_date desc, consumer
+    </select>
+
+    <select id="selectBookSummaryById" parameterType="Long" resultMap="BookSummaryResult">
+        <include refid="selectBookSummaryVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertBookSummary" parameterType="BookSummary">
+        insert into book_summary
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="id != null ">id,</if>
+            <if test="consumer != null  and consumer != ''">consumer,</if>
+            <if test="sum != null ">sum,</if>
+            <if test="average != null ">average,</if>
+            <if test="account != null ">account,</if>
+            <if test="consumeDate != null ">consume_date,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="id != null ">#{id},</if>
+            <if test="consumer != null  and consumer != ''">#{consumer},</if>
+            <if test="sum != null ">#{sum},</if>
+            <if test="average != null ">#{average},</if>
+            <if test="account != null ">#{account},</if>
+            <if test="consumeDate != null ">#{consumeDate},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBookSummary" parameterType="BookSummary">
+        update book_summary
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="consumer != null  and consumer != ''">consumer = #{consumer},</if>
+            <if test="sum != null ">sum = #{sum},</if>
+            <if test="average != null ">average = #{average},</if>
+            <if test="account != null ">account = #{account},</if>
+            <if test="consumeDate != null ">consume_date = #{consumeDate},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteBookSummaryById" parameterType="Long">
+        delete from book_summary where id = #{id}
+    </delete>
+
+    <delete id="deleteBookSummaryByIds" parameterType="String">
+        delete from book_summary where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectBookMonthList" parameterType="BookMonth" resultMap="BookMonthResult">
+        <include refid="selectBookMonthList"/>
+        ORDER BY month desc
+    </select>
+
+</mapper>

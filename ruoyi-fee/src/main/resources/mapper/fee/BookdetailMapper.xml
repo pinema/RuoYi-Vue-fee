@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.fee.mapper.BookdetailMapper">
+
+    <resultMap type="Bookdetail" id="BookdetailResult">
+        <result property="id"    column="id"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="type"    column="type"    />
+        <result property="fee"    column="fee"    />
+        <result property="date"    column="date"    />
+        <result property="name"    column="name"    />
+    </resultMap>
+
+    <resultMap type="BookDetailOutput" id="BookDetailOutputResult">
+        <result property="id"    column="id"    />
+        <result property="deptId"    column="dept_id"    />
+        <result property="type"    column="type"    />
+        <result property="fee"    column="fee"    />
+        <result property="date"    column="date"    />
+        <result property="name"    column="name"    />
+    </resultMap>
+
+    <resultMap type="BookUser" id="BookDetailUserResult">
+        <result property="id"    column="dict_value"    />
+        <result property="name"    column="dict_label"    />
+    </resultMap>
+
+    <resultMap type="BookSum" id="BookSumResult">
+        <result property="id"    column="id"    />
+        <result property="consumer"    column="consumer"    />
+        <result property="sum"    column="sum"    />
+        <result property="average"    column="average"    />
+        <result property="account"    column="account"    />
+        <result property="consumeDate"    column="consume_date"    />
+    </resultMap>
+
+    <resultMap type="BookType" id="BookTypeResult">
+        <result property="id"    column="dict_value"    />
+        <result property="typeName"    column="dict_label"    />
+    </resultMap>
+
+    <resultMap type="BookMonth" id="BookMonthResult">
+        <result property="id"    column="row_id"    />
+        <result property="month"    column="book_month"    />
+    </resultMap>
+
+    <sql id="selectBookdetailVo">
+        select id, dept_id, type, fee, date, name, description from bookdetail
+    </sql>
+
+    <sql id="selectBookdetailList">
+        SELECT
+        id,
+        dept_id,
+        b.dict_label type,
+        fee,
+        date,
+        c.dict_label name,
+        description
+        FROM
+        bookdetail a
+        LEFT JOIN sys_dict_data b ON b.dict_type = 'consume_type'
+        and a.type = b.dict_value
+        LEFT JOIN sys_dict_data c ON c.dict_type = 'consume_name'
+        and a.name = c.dict_value
+    </sql>
+
+    <sql id="selectBookDetailListApp">
+        SELECT
+        id,
+        dept_id,
+        b.dict_label type,
+        fee,
+        date_format(date,'%Y-%m-%d') date,
+        c.dict_label name,
+        description
+        FROM
+        bookdetail a
+        LEFT JOIN sys_dict_data b ON b.dict_type = 'consume_type'
+        and a.type = b.dict_value
+        LEFT JOIN sys_dict_data c ON c.dict_type = 'consume_name'
+        and a.name = c.dict_value
+    </sql>
+
+    <sql id="selectBookDetailUserList">
+        SELECT
+        dict_value,
+        dict_label
+        FROM
+        sys_dict_data
+    </sql>
+
+    <sql id="selectBookSumSub">
+        SELECT
+        cast(fee as decimal(9,2)) fee,
+        date_format(date,'%Y-%m') consume_date,
+        b.dict_label consumer
+        FROM
+        bookdetail a
+        LEFT JOIN sys_dict_data b ON b.dict_type = 'consume_name'
+        and a.name = b.dict_value
+    </sql>
+
+    <sql id="selectBookSumVo">
+<!--        select id, consumer, sum, average, account, consume_date from bookdetail a-->
+        select consumer, SUM(fee) sum, t1.consume_date, average
+        from
+        (<include refid="selectBookSumSub"/>) t1
+        left join (<include refid="selectBookAvg"/>) t2
+        on t1.consume_date = t2.consume_date
+        GROUP BY consume_date, consumer, average
+<!--        ORDER BY consume_date, consumer-->
+    </sql>
+
+    <sql id="selectBookSum">
+        select consumer, SUM(fee) sum, consume_date
+        from
+        (<include refid="selectBookSumSub"/>) y1
+        GROUP BY consume_date, consumer
+    </sql>
+
+    <sql id="selectBookAvg">
+        select sum(sum) sum, round(avg(sum), 2) average, consume_date
+        from
+        (<include refid="selectBookSum"/>) u1
+        GROUP BY consume_date
+    </sql>
+
+    <sql id="selectBookTypeList">
+        SELECT
+        dict_value,
+        dict_label
+        FROM
+        sys_dict_data
+    </sql>
+
+    <sql id="selectBookMonthList">
+        SELECT
+        dict_value,
+        dict_label
+        FROM
+        bookdetail
+    </sql>
+
+    <select id="selectBookdetailList" parameterType="Bookdetail" resultMap="BookdetailResult">
+<!--        <include refid="selectBookdetailVo"/>-->
+        <include refid="selectBookdetailList"/>
+        <where>
+            <if test="deptId != null "> and dept_id = #{deptId}</if>
+            <if test="type != null  and type != ''"> and type = #{type}</if>
+<!--            <if test="fee != null "> and fee = #{fee}</if>-->
+<!--            <if test="date != null "> and date = #{date}</if>-->
+            <if test="params.beginDate != null and params.beginDate != ''"><!-- 开始时间检索 -->
+                and date_format(date,'%Y-%m-%d') &gt;= date_format(#{params.beginDate},'%Y-%m-%d')
+            </if>
+            <if test="params.endDate != null and params.endDate != ''"><!-- 结束时间检索 -->
+                and date_format(date,'%Y-%m-%d') &lt;= date_format(#{params.endDate},'%Y-%m-%d')
+            </if>
+            <if test="name != null  and name != ''"> and name like concat('%', #{name}, '%')</if>
+        </where>
+        order by date desc, name
+    </select>
+
+    <select id="selectBookdetailById" parameterType="Long" resultMap="BookdetailResult">
+        <include refid="selectBookdetailVo"/>
+        where id = #{id}
+    </select>
+
+    <insert id="insertBookdetail" parameterType="Bookdetail" useGeneratedKeys="true" keyProperty="id">
+        insert into bookdetail
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="deptId != null ">dept_id,</if>
+            <if test="type != null  and type != ''">type,</if>
+            <if test="fee != null ">fee,</if>
+            <if test="date != null ">date,</if>
+            <if test="name != null  and name != ''">name,</if>
+            <if test="description != null  and description != ''">description,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="deptId != null ">#{deptId},</if>
+            <if test="type != null  and type != ''">#{type},</if>
+            <if test="fee != null ">#{fee},</if>
+            <if test="date != null ">#{date},</if>
+            <if test="name != null  and name != ''">#{name},</if>
+            <if test="description != null  and description != ''">#{description},</if>
+         </trim>
+    </insert>
+
+    <update id="updateBookdetail" parameterType="Bookdetail">
+        update bookdetail
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="deptId != null ">dept_id = #{deptId},</if>
+            <if test="type != null  and type != ''">type = #{type},</if>
+            <if test="fee != null ">fee = #{fee},</if>
+            <if test="date != null ">date = #{date},</if>
+            <if test="name != null  and name != ''">name = #{name},</if>
+            <if test="description != null  and description != ''">description = #{description},</if>
+        </trim>
+        where id = #{id}
+    </update>
+
+    <delete id="deleteBookdetailById" parameterType="Long">
+        delete from bookdetail where id = #{id}
+    </delete>
+
+    <delete id="deleteBookdetailByIds" parameterType="Long">
+        delete from bookdetail where id in
+        <foreach item="id" collection="array" open="(" separator="," close=")">
+            #{id}
+        </foreach>
+    </delete>
+
+    <select id="selectBookDetailListApp" parameterType="BookDetailInput" resultMap="BookDetailOutputResult">
+        <include refid="selectBookDetailListApp"/>
+        <where>
+            <if test="deptId != null "> and dept_id = #{deptId}</if>
+            <if test="type != null  and type != ''"> and type = #{type}</if>
+<!--            <if test="date != null "> and date = #{date}</if>-->
+            <if test="date != null  and date != ''"> and date_format(date,'%Y-%m') = #{date}</if>
+        </where>
+        <if test="name != null  and name != ''"> HAVING name like concat('%', #{name}, '%')</if>
+        order by date desc, name,type,fee
+    </select>
+
+    <select id="selectBookDetailUserList" parameterType="String" resultMap="BookDetailUserResult">
+        <include refid="selectBookDetailUserList"/>
+        <where>
+            dict_type = 'consume_name'
+        </where>
+    </select>
+
+    <select id="selectBookSumList" parameterType="BookSum" resultMap="BookSumResult">
+        <include refid="selectBookSumVo"/>
+        <where>
+            <if test="consumer != null  and consumer != ''"> and consumer = #{consumer}</if>
+<!--            <if test="sum != null "> and sum = #{sum}</if>-->
+<!--            <if test="average != null "> and average = #{average}</if>-->
+<!--            <if test="account != null "> and account = #{account}</if>-->
+            <if test="consumeDate != null "> and consume_date = #{consumeDate}</if>
+        </where>
+        ORDER BY consume_date desc, consumer
+    </select>
+
+    <select id="selectBookTypeList" parameterType="String" resultMap="BookTypeResult">
+        <include refid="selectBookTypeList"/>
+        <where>
+            dict_type = 'consume_type'
+        </where>
+    </select>
+
+</mapper>
